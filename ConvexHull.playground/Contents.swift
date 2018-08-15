@@ -10,10 +10,12 @@ typealias Point = (x: Int, y: Int)
 typealias Vector = (terminalPoint: Point, slope: Double, magnitute: Double)
 typealias Directions = (Direction?, Direction?)
 
-// Counterclockwise path around 2D inflection points goes in this order
+// Counterclockwise path around a set of 2D inflection points moves in this order
+// Visualize that you're moving around a regular octogon starting from the left-bottom
 let validPath: [String] = ["SE", "E", "NE", "N", "NW", "W", "SW", "S"]
 
-// Inflection points starting from leftmost bottom point (west-most then south-most or WS)
+// Description of a set of inflection points
+// Ordered from leftmost bottom point (WS, or west-south-most) counterclockwise around a shape
 let localMaximums = ["WS", "SW", "SE", "ES", "EN", "NE", "NW", "WN"]
 
 // Main function.  Takes a set of arbitrary points (n >= 3) and returns an ordered subset of those points representing its convex hull
@@ -25,6 +27,39 @@ func convexHull(_ points: [Point]) -> [Point] {
     //print("convex path:  \(convexPath)")
     let efficientConvexPath = removeColinearPoints(convexPath)
     return efficientConvexPath
+}
+
+// This is what makes a general (ordered) path into a convex one
+// Traverses a path and ensures all turns are counterclockwise and occur at hull points
+func removeConcavePoints(_ path: [Point]) -> [Point] {
+    var lastValidPointIndex = 0
+    var lastValidDirectionIndex = 0
+    var testPointIndex = 1
+    var trimmedPath: [Point] = [path[0]]
+    let validPathDirections: [Directions] = validPath.map{ directions($0) }
+    
+    //TODO check connection between path[n-1] and path[0] to ensure last point fits
+    while testPointIndex < path.count {
+        let lastValidPoint = path[lastValidPointIndex]
+        let lastValidDirections = validPathDirections[lastValidDirectionIndex]
+        let testPoint = path[testPointIndex]
+        let pathDirections = directionsBetween(p1: lastValidPoint, p2: testPoint)
+        
+        if pathDirections == lastValidDirections {
+            trimmedPath.append(testPoint)
+            lastValidPointIndex = testPointIndex
+        } else {
+            let testDirectionsIndex = validDirectionsIndex(pathDirections)
+            let testInflectionPoint = inflectionPoint(path, directions: directions(localMaximums[testDirectionsIndex]))
+            if testDirectionsIndex >= lastValidDirectionIndex && testInflectionPoint == lastValidPoint {
+                trimmedPath.append(testPoint)
+                lastValidPointIndex = testPointIndex
+                lastValidDirectionIndex = testDirectionsIndex
+            }
+        }
+        testPointIndex += 1
+    }
+    return trimmedPath
 }
 
 // Removes points that are between a grid of inflection points, meaning they cannot be on the hull
@@ -103,39 +138,6 @@ func directionsBetween(p1: Point, p2: Point) -> Directions {
     let d1: Direction? = dirs.count > 0 ? dirs[0] : nil
     let d2: Direction? = dirs.count > 1 ? dirs[1] : nil
     return (d1, d2)
-}
-
-// Traverses a path and ensures all turns are counterclockwise and occur at hull points
-// This is what makes a general (ordered) path into a convex one
-func removeConcavePoints(_ path: [Point]) -> [Point] {
-    var lastValidPointIndex = 0
-    var lastValidDirectionIndex = 0
-    var testPointIndex = 1
-    var trimmedPath: [Point] = [path[0]]
-    let validPathDirections: [Directions] = validPath.map{ directions($0) }
-    
-    //TODO check connection between path[n-1] and path[0] to ensure last point fits
-    while testPointIndex < path.count {
-        let lastValidPoint = path[lastValidPointIndex]
-        let lastValidDirections = validPathDirections[lastValidDirectionIndex]
-        let testPoint = path[testPointIndex]
-        let pathDirections = directionsBetween(p1: lastValidPoint, p2: testPoint)
-        
-        if pathDirections == lastValidDirections {
-            trimmedPath.append(testPoint)
-            lastValidPointIndex = testPointIndex
-        } else {
-            let testDirectionsIndex = validDirectionsIndex(pathDirections)
-            let testInflectionPoint = inflectionPoint(path, directions: directions(localMaximums[testDirectionsIndex]))
-            if testDirectionsIndex >= lastValidDirectionIndex && testInflectionPoint == lastValidPoint {
-                trimmedPath.append(testPoint)
-                lastValidPointIndex = testPointIndex
-                lastValidDirectionIndex = testDirectionsIndex
-            }
-        }
-        testPointIndex += 1
-    }
-    return trimmedPath
 }
 
 // Searches for and returns local extreme point.
