@@ -205,16 +205,21 @@ func magnitudeSquared(p1: Point, p2: Point) -> Double {
 
 let triangle: [Point] = [(1, 1), (3, 3), (2, 2)]
 print("triangle: \(convexHull(triangle))")
+// triangle: [(x: 1, y: 1), (x: 2, y: 2), (x: 3, y: 3)]
 
 let square: [Point] = [(0, 0), (1, 0), (1, 1), (0, 1)]
 print("square  : \(convexHull(square))")
+// square  : [(x: 0, y: 0), (x: 1, y: 0), (x: 1, y: 1), (x: 0, y: 1)]
 
 let octogon: [Point] = [(0, 1), (1, 0), (2, 0), (3, 1), (3, 2), (2, 3), (1, 3), (0, 2)]
 print("octogon : \(convexHull(octogon))")
+// octogon : [(x: 0, y: 1), (x: 1, y: 0), (x: 2, y: 0), (x: 3, y: 1), (x: 3, y: 2), (x: 2, y: 3), (x: 1, y: 3), (x: 0, y: 2)]
 
 // the convex hull of a cross shape should be an octogon
 let cross: [Point] = [(0, 1), (1, 1), (1, 0), (2, 0), (2, 1), (3, 1), (3, 2), (2, 2), (2, 3), (1, 3), (1, 2), (0, 2)]
 print("cross   : \(convexHull(cross))")
+// cross   : [(x: 0, y: 1), (x: 1, y: 0), (x: 2, y: 0), (x: 3, y: 1), (x: 3, y: 2), (x: 2, y: 3), (x: 1, y: 3), (x: 0, y: 2)]
 
 let testPoints: [Point] = [(0, 3), (2, 2), (1, 1), (2, 1), (3, 0), (0, 0), (3, 3)]
 print("random  : \(convexHull(testPoints))")
+// random  : [(x: 0, y: 0), (x: 3, y: 0), (x: 3, y: 3), (x: 0, y: 3)]
