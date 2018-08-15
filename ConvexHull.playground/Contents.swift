@@ -1,3 +1,4 @@
+// Compass points refer to relative location of points (.up = maximum y coordinate) as well as direction of travel (e.g. up = north)
 enum Direction: String {
     case north = "N"
     case south = "S"
@@ -7,22 +8,73 @@ enum Direction: String {
 
 typealias Point = (x: Int, y: Int)
 typealias Vector = (terminalPoint: Point, slope: Double, magnitute: Double)
-
 typealias Directions = (Direction?, Direction?)
 
+// Counterclockwise path around 2D inflection points goes in this order
 let validPath: [String] = ["SE", "E", "NE", "N", "NW", "W", "SW", "S"]
+
+// Inflection points starting from leftmost bottom point (west-most then south-most or WS)
 let localMaximums = ["WS", "SW", "SE", "ES", "EN", "NE", "NW", "WN"]
 
-func desc(_ d: Directions?) -> String {
-    return (d?.0?.rawValue ?? "") + (d?.1?.rawValue ?? "")
+// Main function.  Takes a set of arbitrary points (n >= 3) and returns an ordered subset of those points representing its convex hull
+func convexHull(_ points: [Point]) -> [Point] {
+    let exteriorPoints = removeInteriorPoints(points)
+    let concavePath = hullPath(exteriorPoints)
+    //print("concave path: \(concavePath)")
+    let convexPath = removeConcavePoints(concavePath)
+    //print("convex path:  \(convexPath)")
+    let efficientConvexPath = removeColinearPoints(convexPath)
+    return efficientConvexPath
 }
 
+// Removes points that are between a grid of inflection points, meaning they cannot be on the hull
+func removeInteriorPoints(_ points: [Point]) -> [Point] {
+    //TODO implement to pre-optimize concave path function call
+    return points
+}
+
+// Generates a directed path from an arbitrary set of points
+func hullPath(_ points: [Point]) -> [Point] {
+    let leftMostPoint: Point = inflectionPoint(points, directions: (.west, .south))
+    var vectorSet = vectors(leftMostPoint, terminalPoints: points)
+    vectorSet.sort { (lhs, rhs) in
+        return lhs.slope < rhs.slope || (lhs.slope == rhs.slope && lhs.magnitute < rhs.magnitute)
+    }
+    var path = vectorSet.map { return $0.terminalPoint }
+    path.insert(leftMostPoint, at: 0)
+    return path
+}
+
+// Generates some vectors from a stationary point.
+// Facilitates the ordering of points used to make up the initial path
+func vectors(_ initialPoint: Point, terminalPoints: [Point]) -> [Vector] {
+    var vectors: [Vector] = []
+    terminalPoints.forEach { terminalPoint in
+        if terminalPoint.x == initialPoint.x && terminalPoint.y == initialPoint.y {
+            return
+        }
+        let relativeSlope = slope(p1: initialPoint, p2: terminalPoint)
+        let relativeMagnitude = magnitudeSquared(p1: initialPoint, p2: terminalPoint)
+        let vector: Vector = (terminalPoint, relativeSlope, relativeMagnitude)
+        vectors.append(vector)
+    }
+    return vectors
+}
+
+// Gets rid points that will not affect hull shape (including duplicates)
+func removeColinearPoints(_ points: [Point]) -> [Point] {
+    //TODO implement to remove redundant hull points
+    return points
+}
+
+// Convenience func to turn strings to Direction-Tuples, e.g. NW -> (.north, .west)
 func directions(_ s: String) -> Directions {
     let first = charAt(s, i: 0)
     let second = charAt(s, i: 1)
     return (Direction(rawValue: first)!, Direction(rawValue: second))
 }
 
+// Find a char in a UTF8 string.  Unicode will break
 func charAt(_ s: String, i: Int) -> String {
     guard i < s.count else {
         return ""
@@ -30,6 +82,12 @@ func charAt(_ s: String, i: Int) -> String {
     return String(s[s.index(s.startIndex, offsetBy: i)])
 }
 
+// Convenience func to turn Direction-Tuples into strings, e.g. (.north, .west) -> NW
+func desc(_ d: Directions?) -> String {
+    return (d?.0?.rawValue ?? "") + (d?.1?.rawValue ?? "")
+}
+
+// Return the direction between two points.  For example (0, 0) to (1, 1) will return (.north, .east)
 func directionsBetween(p1: Point, p2: Point) -> Directions {
     var dirs: [Direction] = []
     if p1.y < p2.y {
@@ -47,11 +105,14 @@ func directionsBetween(p1: Point, p2: Point) -> Directions {
     return (d1, d2)
 }
 
+// Traverses a path and ensures all turns are counterclockwise and occur at hull points
+// This is what makes a general (ordered) path into a convex one
 func removeConcavePoints(_ path: [Point]) -> [Point] {
     var lastValidPointIndex = 0
     var lastValidDirectionIndex = 0
     var testPointIndex = 1
     var trimmedPath: [Point] = [path[0]]
+    let validPathDirections: [Directions] = validPath.map{ directions($0) }
     
     //TODO check connection between path[n-1] and path[0] to ensure last point fits
     while testPointIndex < path.count {
@@ -77,10 +138,14 @@ func removeConcavePoints(_ path: [Point]) -> [Point] {
     return trimmedPath
 }
 
+// Searches for and returns local extreme point.
+// For instance (.north, .east) will return the north-most point (if multiple, the east-most of those is used to break the tie)
 func inflectionPoint(_ points: [Point], directions: Directions) -> Point {
     return maximums(maximums(points, direction: directions.0!), direction: directions.1!).first!
 }
 
+// Helper function for "infectionPoint" call.  This finds all points at the maximum direction
+// For instance .north returns the northmost point and all other points that are equally north
 func maximums(_ points: [Point], direction: Direction) -> [Point] {
     var bestPoint: Point = points.first!
     var bestPoints: [Point] = [bestPoint]
@@ -105,6 +170,7 @@ func maximums(_ points: [Point], direction: Direction) -> [Point] {
     return bestPoints
 }
 
+// Helper for above function.  Selects the "most" of a direction.  .north returns the max y value.  .south returns the min.
 func maximum(lhs: Int, rhs: Int, direction: Direction) -> Int {
     switch direction {
     case .south, .west:
@@ -118,22 +184,7 @@ func validDirectionsIndex(_ directions: Directions) -> Int {
     return validPath.index(of: desc(directions)) ?? -1
 }
 
-let validPathDirections: [Directions] = validPath.map{ directions($0) }
-
-func vectors(_ initialPoint: Point, terminalPoints: [Point]) -> [Vector] {
-    var vectors: [Vector] = []
-    terminalPoints.forEach { terminalPoint in
-        if terminalPoint.x == initialPoint.x && terminalPoint.y == initialPoint.y {
-            return
-        }
-        let relativeSlope = slope(p1: initialPoint, p2: terminalPoint)
-        let relativeMagnitude = magnitudeSquared(p1: initialPoint, p2: terminalPoint)
-        let vector: Vector = (terminalPoint, relativeSlope, relativeMagnitude)
-        vectors.append(vector)
-    }
-    return vectors
-}
-
+// Helper function for computing vectors
 func slope(p1: Point, p2: Point) -> Double {
     let xdiff = Double(p2.x - p1.x)
     let ydiff = Double(p2.y - p1.y)
@@ -143,58 +194,25 @@ func slope(p1: Point, p2: Point) -> Double {
     return ydiff / xdiff
 }
 
+// Helper function for computing vectors.  No need for square root since it's only a comparison value
 func magnitudeSquared(p1: Point, p2: Point) -> Double {
     let xdiff = Double(p2.x - p1.x)
     let ydiff = Double(p2.y - p1.y)
     return xdiff * xdiff + ydiff * ydiff
 }
 
-func hullPath(_ points: [Point]) -> [Point] {
-    let leftMostPoint: Point = inflectionPoint(points, directions: (.west, .south))
-    var vectorSet = vectors(leftMostPoint, terminalPoints: points)
-    vectorSet.sort { (lhs, rhs) in
-        return lhs.slope < rhs.slope || (lhs.slope == rhs.slope && lhs.magnitute < lhs.magnitute)
-    }
-    var path = vectorSet.map { return $0.terminalPoint }
-    path.insert(leftMostPoint, at: 0)
-    return path
-}
-
-func convexHull(_ points: [Point]) -> [Point] {
-    let exteriorPoints = removeInteriorPoints(points)
-    let concavePath = hullPath(exteriorPoints)
-    
-    print("concave path: \(concavePath)")
-    
-    let convexPath = removeConcavePoints(concavePath)
-    
-    print("convex path:  \(convexPath)")
-    
-    let efficientConvexPath = removeColinearPoints(convexPath)
-    return efficientConvexPath
-}
-
-func removeInteriorPoints(_ points: [Point]) -> [Point] {
-    //TODO implement for optimization
-    return points
-}
-
-func removeColinearPoints(_ points: [Point]) -> [Point] {
-    //TODO implement to remove redundant hull points
-    return points
-}
-
-/*let triangle: [Point] = [(1, 1), (3, 3), (2, 2)]
-print(trimmed(triangle))
+let triangle: [Point] = [(1, 1), (3, 3), (2, 2)]
+print("triangle: \(convexHull(triangle))")
 
 let square: [Point] = [(0, 0), (1, 0), (1, 1), (0, 1)]
-print(trimmed(square))
+print("square  : \(convexHull(square))")
 
 let octogon: [Point] = [(0, 1), (1, 0), (2, 0), (3, 1), (3, 2), (2, 3), (1, 3), (0, 2)]
-print(trimmed(octogon))
+print("octogon : \(convexHull(octogon))")
 
+// the convex hull of a cross shape should be an octogon
 let cross: [Point] = [(0, 1), (1, 1), (1, 0), (2, 0), (2, 1), (3, 1), (3, 2), (2, 2), (2, 3), (1, 3), (1, 2), (0, 2)]
-print(trimmed(cross))*/
+print("cross   : \(convexHull(cross))")
 
-let points: [Point] = [(0, 3), (2, 2), (1, 1), (2, 1), (3, 0), (0, 0), (3, 3)]
-convexHull(points)
+let testPoints: [Point] = [(0, 3), (2, 2), (1, 1), (2, 1), (3, 0), (0, 0), (3, 3)]
+print("random  : \(convexHull(testPoints))")
